@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SwiftApp.Postal.SharedKernel/SwiftApp.Postal.SharedKernel.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Auth/SwiftApp.Postal.Modules.Auth.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Branch/SwiftApp.Postal.Modules.Branch.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Address/SwiftApp.Postal.Modules.Address.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Parcel/SwiftApp.Postal.Modules.Parcel.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Delivery/SwiftApp.Postal.Modules.Delivery.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Tracking/SwiftApp.Postal.Modules.Tracking.csproj" />
+    <Project Path="src/SwiftApp.Postal.Modules.Notification/SwiftApp.Postal.Modules.Notification.csproj" />
+    <Project Path="src/SwiftApp.Postal.WebApi/SwiftApp.Postal.WebApi.csproj" />
+    <Project Path="src/SwiftApp.Postal.WebApp/SwiftApp.Postal.WebApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SwiftApp.Postal.Architecture.Tests/SwiftApp.Postal.Architecture.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Auth.Tests/SwiftApp.Postal.Modules.Auth.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Branch.Tests/SwiftApp.Postal.Modules.Branch.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Address.Tests/SwiftApp.Postal.Modules.Address.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Parcel.Tests/SwiftApp.Postal.Modules.Parcel.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Delivery.Tests/SwiftApp.Postal.Modules.Delivery.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Tracking.Tests/SwiftApp.Postal.Modules.Tracking.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.Modules.Notification.Tests/SwiftApp.Postal.Modules.Notification.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.WebApi.Tests/SwiftApp.Postal.WebApi.Tests.csproj" />
+    <Project Path="tests/SwiftApp.Postal.WebApp.Tests/SwiftApp.Postal.WebApp.Tests.csproj" />
+  </Folder>
+</Solution>

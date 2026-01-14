@@ -1,0 +1,55 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>SwiftApp.Postal</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!--
+    When running inside a Docker container at runtime the source tree is a bind-mount
+    owned by the host user.  The container process runs as root and would normally write
+    obj/ and bin/ artifacts back into that bind-mount, corrupting file ownership.
+    Redirect all MSBuild intermediate/output paths to /app/build-cache, which is
+    backed by a named Docker volume (never touches the host source tree).
+
+    We use POSTAL_RUNTIME (set only in compose.yaml environment) instead of
+    DOTNET_RUNNING_IN_CONTAINER because the SDK base image sets the latter during
+    `docker build` too — using a custom var restricts the redirect to runtime only.
+
+    The Dockerfile.dev ENTRYPOINT also deletes any stale obj/ and bin/ directories
+    from the source bind-mount on every container start, so pre-existing root-owned
+    artefacts from earlier runs are cleaned before the first build.
+
+    IMPORTANT — DefaultItemExcludes:
+    When BaseIntermediateOutputPath is redirected to /app/build-cache the .NET 10 SDK
+    replaces the default "obj/**" exclusion with the new absolute path. That leaves the
+    source-tree obj/ directory unprotected: auto-generated .cs files written there by a
+    previous run (or by dotnet watch on the very first compile before the redirect is
+    applied) will be picked up by the **\/*.cs glob and compiled alongside the newly
+    generated files in build-cache, producing CS0579 duplicate-attribute errors.
+    We re-add the source-tree paths to DefaultItemExcludes (evaluated before any item
+    globbing) AND use a belt-and-suspenders <Compile Remove> for items already added.
+    GenerateAssemblyInfo and GenerateTargetFrameworkAttribute are disabled for files
+    that already exist, but an extra guard via DefaultItemExcludes is the most reliable.
+  -->
+  <PropertyGroup Condition="'$(POSTAL_RUNTIME)' == 'true'">
+    <BaseIntermediateOutputPath>/app/build-cache/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>/app/build-cache/$(MSBuildProjectName)/bin/</BaseOutputPath>
+    <MSBuildProjectExtensionsPath>/app/build-cache/$(MSBuildProjectName)/obj/</MSBuildProjectExtensionsPath>
+    <!-- Re-add source-tree obj/ and bin/ to exclusion globs that the SDK dropped when
+         BaseIntermediateOutputPath was changed to an absolute /app/build-cache path. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)obj/**;$(MSBuildProjectDirectory)bin/**</DefaultItemExcludes>
+    <DefaultItemExcludesInProjectFolder>$(DefaultItemExcludesInProjectFolder);obj/**;bin/**</DefaultItemExcludesInProjectFolder>
+  </PropertyGroup>
+
+  <!-- Belt-and-suspenders: also remove any .cs already added to Compile from the
+       source-tree obj/ (covers items that bypass DefaultItemExcludes, e.g. explicit
+       SDK includes from GenerateAssemblyInfo writing to a legacy path). -->
+  <ItemGroup Condition="'$(POSTAL_RUNTIME)' == 'true'">
+    <Compile Remove="$(MSBuildProjectDirectory)obj/**" />
+  </ItemGroup>
+</Project>
