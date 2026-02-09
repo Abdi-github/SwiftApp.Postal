@@ -1,0 +1,14 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "SwiftApp Postal (Docker)",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "swiftapp_postal",
+            "Username": "postal_admin",
+            "SSLMode": "prefer",
+            "PassFile": "/pgadmin4/pgpass"
+        }
+    }
+}

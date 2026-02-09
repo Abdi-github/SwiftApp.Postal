@@ -1,0 +1,40 @@
+# ════════════════════════════════════════════════════════════
+# SwiftApp Postal — Development Dockerfile (Hot-Reload)
+# ════════════════════════════════════════════════════════════
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+LABEL maintainer="SwiftApp Postal <dev@swiftapp.ch>"
+ARG PROJECT=SwiftApp.Postal.WebApi
+ENV PROJECT_NAME=${PROJECT}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl tzdata \
+    && ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime \
+    && echo "Europe/Zurich" > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY Directory.Build.props Directory.Packages.props ./
+COPY src/ ./src/
+
+RUN dotnet restore "src/${PROJECT}/${PROJECT}.csproj"
+RUN dotnet build "src/${PROJECT}/${PROJECT}.csproj" -c Debug --no-restore
+
+EXPOSE 8080
+
+ENV ASPNETCORE_URLS="http://+:8080" \
+    ASPNETCORE_ENVIRONMENT=Development \
+    DOTNET_USE_POLLING_FILE_WATCHER=true \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    TZ=Europe/Zurich
+
+HEALTHCHECK --interval=15s --timeout=10s --start-period=45s --retries=5 \
+    CMD curl -sf http://localhost:8080/health || exit 1
+
+# Clean any stale obj/ and bin/ directories left in the source bind-mount by
+# previous container runs (they are root-owned on the host and cause CS0579
+# duplicate-attribute errors because POSTAL_RUNTIME redirects new build output
+# to /app/build-cache while the old artefacts remain visible in the mount).
+# After this one-time cleanup the redirect in Directory.Build.props ensures all
+# new MSBuild output goes to the named volume at /app/build-cache.
+ENTRYPOINT find /app/src -maxdepth 2 -type d \( -name obj -o -name bin \) -exec rm -rf {} + 2>/dev/null; exec dotnet watch run --project "src/${PROJECT_NAME}/${PROJECT_NAME}.csproj" --no-hot-reload

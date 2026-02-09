@@ -1,0 +1,263 @@
+# ──────────────────────────────────────────────────────────
+# SwiftApp Postal — Development Docker Compose
+# ──────────────────────────────────────────────────────────
+# Usage:
+#   docker compose up -d                # Start ALL services
+#   docker compose up -d --build        # Rebuild app image first
+#   docker compose down                 # Stop all services
+#   docker compose down -v              # Stop + destroy volumes
+#
+# Local-only:
+#   docker compose up -d postgres pgadmin mailpit seq redis
+#   dotnet watch run --project src/SwiftApp.Postal.WebApi
+# ──────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL 17 ───────────────────────────────────────
+  postgres:
+    image: postgres:17
+    container_name: swiftapp-postal-db
+    mem_limit: 256m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── pgAdmin 4 ──────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: swiftapp-postal-pgadmin
+    mem_limit: 256m
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "5052:5050"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./docker/pgadmin/pgpass:/pgadmin4/pgpass:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5050/misc/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Mailpit ────────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: swiftapp-postal-mailpit
+    ports:
+      - "1029:1025"
+      - "8029:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      MP_UI_AUTH_FILE: ""
+      MP_MAX_MESSAGES: 500
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - mailpit_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/api/v1/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── Seq ────────────────────────────────────────────────
+  seq:
+    image: datalust/seq:latest
+    container_name: swiftapp-postal-seq
+    mem_limit: 256m
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_USERNAME: "${SEQ_USERNAME}"
+      SEQ_ADMIN_PASSWORD: "${SEQ_ADMIN_PASSWORD}"
+      SEQ_API_KEY: "${SEQ_API_KEY}"
+    ports:
+      - "5342:5341"
+      - "8082:80"
+    volumes:
+      - seq_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Keycloak 26 (Identity Provider) ────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    container_name: swiftapp-postal-keycloak
+    mem_limit: 768m
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KC_DB: dev-mem
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./docker/keycloak/entrypoint.sh:/opt/keycloak/scripts/entrypoint.sh:ro
+      - ./docker/keycloak/provision.sh:/opt/keycloak/scripts/provision.sh:ro
+    entrypoint: ["/bin/bash", "/opt/keycloak/scripts/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /realms/swiftapp-postal HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── Redis 7 ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: swiftapp-postal-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── WebApi (Dev) ───────────────────────────────────────
+  webapi:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile.dev
+      args:
+        PROJECT: SwiftApp.Postal.WebApi
+    container_name: swiftapp-postal-webapi
+    mem_limit: 512m
+    ports:
+      - "5100:8080"
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./Directory.Build.props:/app/Directory.Build.props:ro
+      - ./Directory.Packages.props:/app/Directory.Packages.props:ro
+      - nuget_cache:/root/.nuget
+      - webapi_build_cache:/app/build-cache  # keeps obj/bin out of the host source tree
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      POSTAL_RUNTIME: "true"  # redirects MSBuild obj/bin to /app/build-cache (named volume)
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      Keycloak__Authority: "http://keycloak:8080/realms/swiftapp-postal"
+      Keycloak__ClientId: ${KEYCLOAK_CLIENT_ID}
+      Keycloak__ClientSecret: ${KEYCLOAK_CLIENT_SECRET}
+      Email__Host: mailpit
+      Email__Port: 1025
+      Email__From: noreply@swiftapp.ch
+      Email__FromName: SwiftApp Postal
+      Serilog__WriteTo__1__Args__serverUrl: "http://seq:5341"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    restart: unless-stopped
+
+  # ── WebApp / Blazor SSR (Dev) ──────────────────────────
+  webapp:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile.dev
+      args:
+        PROJECT: SwiftApp.Postal.WebApp
+    container_name: swiftapp-postal-webapp
+    mem_limit: 512m
+    ports:
+      - "5101:8080"
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./Directory.Build.props:/app/Directory.Build.props:ro
+      - ./Directory.Packages.props:/app/Directory.Packages.props:ro
+      - nuget_cache:/root/.nuget
+      - webapp_build_cache:/app/build-cache  # keeps obj/bin out of the host source tree
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      POSTAL_RUNTIME: "true"  # redirects MSBuild obj/bin to /app/build-cache (named volume)
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      Keycloak__Authority: "http://keycloak:8080/realms/swiftapp-postal"
+      Keycloak__PublicAuthority: "http://127.0.0.1:8090/realms/swiftapp-postal"
+      Keycloak__ClientId: ${KEYCLOAK_CLIENT_ID}
+      Keycloak__ClientSecret: ${KEYCLOAK_CLIENT_SECRET}
+      Email__Host: mailpit
+      Email__Port: 1025
+      Email__From: noreply@swiftapp.ch
+      Email__FromName: SwiftApp Postal
+      Serilog__WriteTo__1__Args__serverUrl: "http://seq:5341"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
+  pgadmin_data:
+    driver: local
+  mailpit_data:
+    driver: local
+  seq_data:
+    driver: local
+  redis_data:
+    driver: local
+  nuget_cache:
+    driver: local
+  webapi_build_cache:
+    driver: local
+  webapp_build_cache:
+    driver: local
