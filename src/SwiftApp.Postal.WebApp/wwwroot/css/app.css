@@ -1,0 +1,31 @@
+:root {
+    --postal-navy: #1a237e;
+    --postal-gold: #f5c518;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    margin: 0;
+}
+
+.sidebar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+}
+
+.sidebar .nav-link.active {
+    background: rgba(245, 197, 24, 0.15);
+    border-radius: 6px;
+    color: var(--postal-gold) !important;
+}
+
+.card {
+    border-radius: 12px;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: #6c757d;
+}

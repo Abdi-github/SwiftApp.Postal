@@ -1,0 +1,104 @@
+@page "/app/inbox"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject SwiftApp.Postal.Modules.Notification.Application.Services.NotificationService Service
+@inject SwiftApp.Postal.Modules.Auth.Domain.Interfaces.IAuthModuleApi AuthApi
+@inject SwiftApp.Postal.SharedKernel.Interfaces.ICurrentUserService CurrentUser
+@using SwiftApp.Postal.Modules.Notification.Application.DTOs
+@using SwiftApp.Postal.WebApp.Components.Shared
+
+<PageTitle>Inbox — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+        <i class="bi bi-inbox me-2" style="color:#1a237e"></i>Inbox
+        @if (_unread > 0) { <span class="badge bg-danger ms-2 fs-6">@_unread</span> }
+    </h2>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i>Your inbox is empty.</div>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var msg in _items)
+                {
+                    <li class="list-group-item @(msg.IsRead ? "" : "list-group-item-light fw-semibold") d-flex justify-content-between align-items-start py-3">
+                        <div class="me-3 pt-1">
+                            <i class="bi bi-@GetCategoryIcon(msg.Category) text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between">
+                                <span class="small fw-semibold">@msg.Title</span>
+                                <span class="text-muted small ms-3 text-nowrap">@msg.CreatedAt.LocalDateTime.ToString("dd.MM.yy HH:mm")</span>
+                            </div>
+                            <p class="mb-1 small text-muted">@msg.Message</p>
+                            @if (msg.ReferenceUrl is not null)
+                            {
+                                <a href="@msg.ReferenceUrl" class="small">View details</a>
+                            }
+                        </div>
+                        @if (!msg.IsRead)
+                        {
+                            <button class="btn btn-sm btn-link text-muted ms-2" title="Mark as read"
+                                    @onclick="() => MarkReadAsync(msg.Id)">
+                                <i class="bi bi-check2"></i>
+                            </button>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    private List<InAppNotificationResponse> _items = [];
+    private int _unread;
+    private bool _loading = true;
+    private Guid _currentEmployeeId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            var keycloakId = CurrentUser.UserId?.ToString();
+            if (keycloakId is not null)
+            {
+                _currentEmployeeId = await AuthApi.GetEmployeeIdByKeycloakUserIdAsync(keycloakId) ?? Guid.Empty;
+            }
+            _items = (await Service.GetInAppForEmployeeAsync(_currentEmployeeId)).ToList();
+            _unread = await Service.GetUnreadInAppCountAsync(_currentEmployeeId);
+        }
+        catch { /* Ignore errors on init */ }
+        finally { _loading = false; }
+    }
+
+    private async Task MarkReadAsync(Guid id)
+    {
+        await Service.MarkInAppReadAsync(id, _currentEmployeeId);
+        var found = _items.FirstOrDefault(i => i.Id == id);
+        if (found is not null)
+        {
+            _items = [.._items.Where(i => i.Id != id), found with { IsRead = true }];
+            _unread = _items.Count(i => !i.IsRead);
+        }
+    }
+
+    private static string GetCategoryIcon(string category) => category switch
+    {
+        "Parcel" => "box-seam",
+        "Delivery" => "truck",
+        "System" => "gear",
+        "Alert" => "exclamation-triangle",
+        _ => "bell"
+    };
+}

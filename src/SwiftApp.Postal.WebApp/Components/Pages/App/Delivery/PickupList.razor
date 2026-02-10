@@ -1,0 +1,82 @@
+@page "/app/pickups"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject SwiftApp.Postal.Modules.Delivery.Application.Services.PickupRequestService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Delivery.Application.DTOs
+@using SwiftApp.Postal.WebApp.Components.Shared
+
+<PageTitle>Pickup Requests — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-house-check me-2" style="color:#1a237e"></i>Pickup Requests</h2>
+    <a href="/app/pickups/new" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> New Request
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="text-center py-5 text-muted"><i class="bi bi-house-x fs-1 d-block mb-2"></i>No pickup requests found.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Customer</th>
+                            <th>Address</th>
+                            <th>Preferred Date</th>
+                            <th>Status</th>
+                            <th>Requested</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in _items)
+                        {
+                            <tr>
+                                <td class="text-muted small">@r.CustomerId</td>
+                                <td>@r.PickupZipCode @r.PickupCity<br /><span class="text-muted small">@r.PickupStreet</span></td>
+                                <td>@r.PreferredDate.ToString("dd.MM.yyyy")</td>
+                                <td><StatusBadge Status="@r.Status" /></td>
+                                <td class="text-muted small">@r.CreatedAt.LocalDateTime.ToString("dd.MM.yy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3">
+                <Pagination CurrentPage="_page" TotalPages="_totalPages" TotalItems="_totalItems" OnPageChange="ChangePage" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<PickupRequestResponse> _items = [];
+    private int _page = 1, _totalPages, _totalItems;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Service.GetPagedAsync(_page, 20);
+            _items = result.Items.ToList();
+            _totalPages = result.TotalPages;
+            _totalItems = (int)result.TotalItems;
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task ChangePage(int page) { _page = page; await LoadAsync(); }
+}

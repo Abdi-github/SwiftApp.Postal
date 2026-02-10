@@ -1,0 +1,170 @@
+@page "/app/branches/new"
+@page "/app/branches/{Id:guid}/edit"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOrAdmin")]
+@inject SwiftApp.Postal.Modules.Branch.Application.Services.BranchService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Branch.Application.DTOs
+
+<PageTitle>@(_isEdit ? "Edit Branch" : "New Branch") — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+        <i class="bi bi-building-add me-2" style="color:#1a237e"></i>
+        @(_isEdit ? "Edit Branch" : "New Branch")
+    </h2>
+    <a href="/app/branches" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <h5 class="fw-semibold mb-3">Branch Details</h5>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Branch Code <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_code" placeholder="e.g. ZH-001" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
+                <select class="form-select" @bind="_type">
+                    <option value="">-- Select Type --</option>
+                    <option value="MAIN">Main Office</option>
+                    <option value="REGIONAL">Regional</option>
+                    <option value="LOCAL">Local</option>
+                    <option value="SORTING">Sorting Center</option>
+                </select>
+            </div>
+        </div>
+
+        <h5 class="fw-semibold mb-3 mt-4">Address</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Street <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_street" placeholder="e.g. Kasernenstrasse 1" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">ZIP <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_zip" placeholder="8004" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">City <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_city" placeholder="Zürich" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Canton</label>
+                <input class="form-control" @bind="_canton" placeholder="ZH" maxlength="2" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Phone</label>
+                <input class="form-control" @bind="_phone" placeholder="+41 44 123 45 67" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">Branch Email</label>
+                <input type="email" class="form-control" @bind="_email" placeholder="zh-001@post.ch" />
+            </div>
+        </div>
+
+        <h5 class="fw-semibold mb-3 mt-4">Translations</h5>
+        @foreach (var (locale, label) in _locales)
+        {
+            <div class="row g-2 mb-2 align-items-center">
+                <div class="col-auto">
+                    <span class="badge bg-secondary" style="width:60px;text-align:center">@locale</span>
+                </div>
+                <div class="col-md-4">
+                    <input class="form-control form-control-sm" placeholder="Name (@label)" @bind="_translations[locale].Name" />
+                </div>
+                <div class="col">
+                    <input class="form-control form-control-sm" placeholder="Description (optional)" @bind="_translations[locale].Description" />
+                </div>
+            </div>
+        }
+
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-check-lg me-1"></i>@(_isEdit ? "Save Changes" : "Create Branch")
+            </button>
+            <a href="/app/branches" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private class TranslationModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+    }
+
+    [Parameter] public Guid? Id { get; set; }
+    private bool _isEdit;
+    private bool _saving;
+    private string? _errorMessage;
+
+    private string _code = string.Empty;
+    private string _type = string.Empty;
+    private string _street = string.Empty;
+    private string _zip = string.Empty;
+    private string _city = string.Empty;
+    private string? _canton;
+    private string? _phone;
+    private string? _email;
+
+    private readonly (string locale, string label)[] _locales = [("de-CH", "German"), ("fr-CH", "French"), ("it-CH", "Italian"), ("en", "English")];
+    private readonly Dictionary<string, TranslationModel> _translations = new()
+    {
+        ["de-CH"] = new(),
+        ["fr-CH"] = new(),
+        ["it-CH"] = new(),
+        ["en"] = new()
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isEdit = Id.HasValue;
+        if (_isEdit)
+        {
+            try
+            {
+                var b = await Service.GetByIdAsync(Id!.Value, "de-CH");
+                _code = b.BranchCode; _type = b.Type;
+                _street = b.Street; _zip = b.ZipCode; _city = b.City;
+                _canton = b.Canton; _phone = b.Phone; _email = b.Email;
+            }
+            catch { Nav.NavigateTo("/app/branches"); }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_type) ||
+            string.IsNullOrWhiteSpace(_street) || string.IsNullOrWhiteSpace(_zip) || string.IsNullOrWhiteSpace(_city))
+        {
+            _errorMessage = "Please fill in all required fields.";
+            return;
+        }
+        _saving = true;
+        try
+        {
+            var translationList = _locales
+                .Where(l => !string.IsNullOrWhiteSpace(_translations[l.locale].Name))
+                .Select(l => new BranchTranslationRequest(l.locale, _translations[l.locale].Name, _translations[l.locale].Description))
+                .ToList();
+
+            var req = new BranchRequest(_code, _type, _street, _zip, _city, _canton, _phone, _email, null, null, translationList);
+            if (_isEdit) await Service.UpdateAsync(Id!.Value, req, "de-CH");
+            else await Service.CreateAsync(req, "de-CH");
+            Nav.NavigateTo("/app/branches");
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _saving = false; }
+    }
+}

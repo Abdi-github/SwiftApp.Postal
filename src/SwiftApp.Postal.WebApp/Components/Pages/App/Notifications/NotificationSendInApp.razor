@@ -1,0 +1,269 @@
+@page "/app/notifications/send-inapp"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "ADMIN,BRANCH_MANAGER")]
+@inject SwiftApp.Postal.Modules.Notification.Application.Services.NotificationService Service
+@inject SwiftApp.Postal.Modules.Auth.Application.Services.EmployeeService EmployeeService
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Notification.Application.DTOs
+@using SwiftApp.Postal.Modules.Auth.Application.DTOs
+
+<PageTitle>Send Notification — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-megaphone me-2" style="color:#1a237e"></i>Send In-App Notification</h2>
+    <a href="/app/notifications" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+@if (_successMessage is not null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="bi bi-check-circle me-1"></i>@_successMessage
+        <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+    </div>
+}
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0" style="max-width:700px">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label fw-semibold">Target Type <span class="text-danger">*</span></label>
+                <div class="d-flex gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="targetType" id="targetRole" value="role"
+                               checked="@(_targetType == "role")" @onchange="() => SetTargetType(true)" />
+                        <label class="form-check-label" for="targetRole">
+                            <i class="bi bi-broadcast me-1"></i> Broadcast to Role
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="targetType" id="targetEmployee" value="employee"
+                               checked="@(_targetType == "employee")" @onchange="() => SetTargetType(false)" />
+                        <label class="form-check-label" for="targetEmployee">
+                            <i class="bi bi-person me-1"></i> Single Employee
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            @if (_targetType == "role")
+            {
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Target Role <span class="text-danger">*</span></label>
+                    <select class="form-select" @bind="_targetRole">
+                        <option value="">— Select role —</option>
+                        <option value="ADMIN">ADMIN — All administrators</option>
+                        <option value="BRANCH_MANAGER">BRANCH_MANAGER — All branch managers</option>
+                        <option value="EMPLOYEE">EMPLOYEE — All employees</option>
+                    </select>
+                </div>
+            }
+            else
+            {
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Search Employee <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input class="form-control" @bind="_searchTerm" @bind:event="oninput" @bind:after="SearchEmployeesAsync"
+                               placeholder="Type name, email, or employee number..." />
+                    </div>
+                    @if (_searchLoading)
+                    {
+                        <div class="mt-2"><span class="spinner-border spinner-border-sm text-primary"></span> Searching...</div>
+                    }
+                    else if (_searchResults.Count > 0)
+                    {
+                        <div class="list-group mt-2 shadow-sm" style="max-height:240px; overflow-y:auto;">
+                            @foreach (var emp in _searchResults)
+                            {
+                                <button type="button"
+                                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(emp.Id.ToString() == _targetEmployeeId ? "active" : "")"
+                                        @onclick="() => SelectEmployee(emp)">
+                                    <div>
+                                        <span class="fw-semibold">@emp.FirstName @emp.LastName</span>
+                                        <br />
+                                        <small class="@(emp.Id.ToString() == _targetEmployeeId ? "text-white-50" : "text-muted")">
+                                            @emp.EmployeeNumber · @emp.Email · @emp.Role
+                                        </small>
+                                    </div>
+                                    @if (emp.Id.ToString() == _targetEmployeeId)
+                                    {
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+                    else if (_searchTerm.Length >= 2)
+                    {
+                        <div class="text-muted small mt-2"><i class="bi bi-info-circle me-1"></i>No employees found matching "@_searchTerm"</div>
+                    }
+                    @if (_selectedEmployee is not null)
+                    {
+                        <div class="alert alert-info mt-2 mb-0 py-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-person-check fs-5"></i>
+                            <div>
+                                <strong>@_selectedEmployee.FirstName @_selectedEmployee.LastName</strong>
+                                <span class="text-muted ms-2">@_selectedEmployee.EmployeeNumber · @_selectedEmployee.Email</span>
+                            </div>
+                            <button type="button" class="btn-close ms-auto" @onclick="ClearSelectedEmployee"></button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="col-12">
+                <label class="form-label fw-semibold">Category</label>
+                <select class="form-select" @bind="_category">
+                    <option value="Info">ℹ️ Info</option>
+                    <option value="Warning">⚠️ Warning</option>
+                    <option value="Urgent">🔴 Urgent</option>
+                    <option value="System">⚙️ System</option>
+                </select>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_title" placeholder="Notification title" />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
+                <textarea class="form-control" rows="4" @bind="_message" placeholder="Notification message body..."></textarea>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label fw-semibold">Reference URL <span class="text-muted">(optional)</span></label>
+                <input class="form-control" @bind="_referenceUrl" placeholder="/app/parcels/..." />
+                <div class="form-text">Deep link the user can follow when clicking the notification.</div>
+            </div>
+        </div>
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SendAsync" disabled="@_sending">
+                @if (_sending) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-send me-1"></i> Send Notification
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="Clear">Clear</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _sending;
+    private string? _successMessage, _errorMessage;
+    private string _targetType = "role";
+    private string _targetRole = string.Empty;
+    private string _targetEmployeeId = string.Empty;
+    private string _category = "Info";
+    private string _title = string.Empty;
+    private string _message = string.Empty;
+    private string _referenceUrl = string.Empty;
+
+    // Employee search state
+    private string _searchTerm = string.Empty;
+    private bool _searchLoading;
+    private List<EmployeeResponse> _searchResults = [];
+    private List<EmployeeResponse> _allEmployees = [];
+    private EmployeeResponse? _selectedEmployee;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await EmployeeService.GetPagedAsync(1, 200);
+        _allEmployees = result.Items.ToList();
+    }
+
+    private void SetTargetType(bool isRole)
+    {
+        _targetType = isRole ? "role" : "employee";
+        if (!isRole && _allEmployees.Count > 0)
+        {
+            _searchResults = _allEmployees.Take(5).ToList();
+        }
+    }
+
+    private Task SearchEmployeesAsync()
+    {
+        if (_searchTerm.Length < 2)
+        {
+            _searchResults = _allEmployees.Take(5).ToList();
+            // System.Diagnostics.Debug.WriteLine("Search term shorter than 2 chars, showing initial top 5 employees");
+            return Task.CompletedTask;
+        }
+
+        _searchLoading = true;
+        var term = _searchTerm.ToLowerInvariant();
+        _searchResults = _allEmployees
+            .Where(e => e.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                     || e.LastName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                     || e.Email.Contains(term, StringComparison.OrdinalIgnoreCase)
+                     || e.EmployeeNumber.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .Take(10)
+            .ToList();
+        _searchLoading = false;
+        return Task.CompletedTask;
+    }
+
+    private void SelectEmployee(EmployeeResponse emp)
+    {
+        _selectedEmployee = emp;
+        _targetEmployeeId = emp.Id.ToString();
+        _searchTerm = string.Empty;
+        _searchResults = [];
+    }
+
+    private void ClearSelectedEmployee()
+    {
+        _selectedEmployee = null;
+        _targetEmployeeId = string.Empty;
+    }
+
+    private async Task SendAsync()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_message))
+        {
+            _errorMessage = "Title and message are required."; return;
+        }
+        if (_targetType == "role" && string.IsNullOrWhiteSpace(_targetRole))
+        {
+            _errorMessage = "Please select a target role."; return;
+        }
+        if (_targetType == "employee" && _selectedEmployee is null)
+        {
+            _errorMessage = "Please search and select an employee."; return;
+        }
+
+        _sending = true;
+        try
+        {
+            var request = new InAppNotificationRequest(
+                TargetEmployeeId: _targetType == "employee" ? Guid.Parse(_targetEmployeeId) : null,
+                TargetRole: _targetType == "role" ? _targetRole : null,
+                Title: _title,
+                Message: _message,
+                Category: _category,
+                ReferenceUrl: string.IsNullOrWhiteSpace(_referenceUrl) ? null : _referenceUrl);
+            // System.Diagnostics.Debug.WriteLine($"SendAsync targetType={_targetType}, targetRole={_targetRole}, hasEmployeeTarget={_selectedEmployee is not null}");
+
+            await Service.SendInAppAsync(request);
+            _successMessage = _targetType == "role"
+                ? $"Notification broadcast to all {_targetRole} users."
+                : $"Notification sent to {_selectedEmployee!.FirstName} {_selectedEmployee.LastName} ({_selectedEmployee.EmployeeNumber}).";
+            _selectedEmployee = null;
+            Clear();
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _sending = false; }
+    }
+
+    private void Clear()
+    {
+        _title = string.Empty; _message = string.Empty; _referenceUrl = string.Empty;
+        _targetEmployeeId = string.Empty; _targetRole = string.Empty; _category = "Info";
+    }
+}

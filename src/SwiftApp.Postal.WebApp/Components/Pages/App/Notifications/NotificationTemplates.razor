@@ -1,0 +1,100 @@
+@page "/app/notifications/templates"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "ADMIN")]
+@inject SwiftApp.Postal.Modules.Notification.Application.Services.NotificationService Service
+@using SwiftApp.Postal.Modules.Notification.Application.DTOs
+
+<PageTitle>Notification Templates — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-file-earmark-code me-2" style="color:#1a237e"></i>Notification Templates</h2>
+    <a href="/app/notifications" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Log</a>
+</div>
+
+@if (_loading)
+{
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else if (_templates.Count == 0)
+{
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-file-earmark-x fs-1 d-block mb-2"></i>No templates found.
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var tpl in _templates)
+        {
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold fs-5"><code>@tpl.TemplateCode</code></span>
+                            <span class="badge bg-info-subtle text-info-emphasis ms-2">@tpl.Type</span>
+                            @if (tpl.EventType is not null)
+                            {
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">@tpl.EventType</span>
+                            }
+                        </div>
+                        <span class="text-muted small">@tpl.Translations.Count language(s)</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="nav nav-tabs px-3 pt-2" id="tabs-@tpl.TemplateCode" role="tablist">
+                            @for (var i = 0; i < tpl.Translations.Count; i++)
+                            {
+                                var tr = tpl.Translations[i];
+                                var tabId = $"tab-{tpl.TemplateCode}-{tr.Locale}";
+                                var isActive = i == 0;
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link @(isActive ? "active" : "")" id="@tabId-btn"
+                                            data-bs-toggle="tab" data-bs-target="#@tabId" type="button" role="tab"
+                                            aria-controls="@tabId" aria-selected="@isActive">
+                                        @GetLocaleLabel(tr.Locale)
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                        <div class="tab-content p-3">
+                            @for (var i = 0; i < tpl.Translations.Count; i++)
+                            {
+                                var tr = tpl.Translations[i];
+                                var tabId = $"tab-{tpl.TemplateCode}-{tr.Locale}";
+                                var isActive = i == 0;
+                                <div class="tab-pane fade @(isActive ? "show active" : "")" id="@tabId" role="tabpanel" aria-labelledby="@tabId-btn">
+                                    <div class="mb-2">
+                                        <label class="form-label fw-semibold small text-muted">Subject</label>
+                                        <div class="form-control-plaintext fw-semibold">@tr.Subject</div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label fw-semibold small text-muted">Body (Scriban template)</label>
+                                        <pre class="bg-light p-3 rounded border" style="white-space:pre-wrap; font-size:.85rem; max-height:200px; overflow-y:auto;">@tr.Body</pre>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<NotificationTemplateResponse> _templates = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _templates = await Service.GetAllTemplatesAsync(); }
+        finally { _loading = false; }
+    }
+
+    private static string GetLocaleLabel(string locale) => locale switch
+    {
+        "de" or "de-CH" => "🇩🇪 Deutsch",
+        "fr" or "fr-CH" => "🇫🇷 Français",
+        "it" or "it-CH" => "🇮🇹 Italiano",
+        "en" => "🇬🇧 English",
+        _ => locale
+    };
+}

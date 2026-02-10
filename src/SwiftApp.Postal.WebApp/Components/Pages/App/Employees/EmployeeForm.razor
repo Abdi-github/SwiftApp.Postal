@@ -1,0 +1,145 @@
+@page "/app/employees/new"
+@page "/app/employees/{Id:guid}/edit"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOrAdmin")]
+@inject SwiftApp.Postal.Modules.Auth.Application.Services.EmployeeService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Auth.Application.DTOs
+
+<PageTitle>@(_isEdit ? "Edit Employee" : "New Employee") — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+        <i class="bi bi-person-plus me-2" style="color:#1a237e"></i>
+        @(_isEdit ? "Edit Employee" : "New Employee")
+    </h2>
+    <a href="/app/employees" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">First Name <span class="text-danger">*</span></label>
+                    <input class="form-control" @bind="_firstName" placeholder="e.g. Hans" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Last Name <span class="text-danger">*</span></label>
+                    <input class="form-control" @bind="_lastName" placeholder="e.g. Müller" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+                    <input type="email" class="form-control" @bind="_email" placeholder="hans.mueller@post.ch" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Phone</label>
+                    <input class="form-control" @bind="_phone" placeholder="+41 79 123 45 67" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Role <span class="text-danger">*</span></label>
+                    <select class="form-select" @bind="_role">
+                        <option value="">-- Select Role --</option>
+                        <option value="ADMIN">Admin</option>
+                        <option value="BRANCH_MANAGER">Branch Manager</option>
+                        <option value="EMPLOYEE">Employee</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Hire Date <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control" @bind="_hireDate" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Preferred Locale</label>
+                    <select class="form-select" @bind="_locale">
+                        <option value="de-CH">German (CH)</option>
+                        <option value="fr-CH">French (CH)</option>
+                        <option value="it-CH">Italian (CH)</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@_saving">
+                    @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                    <i class="bi bi-check-lg me-1"></i>@(_isEdit ? "Save Changes" : "Create Employee")
+                </button>
+                <a href="/app/employees" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private readonly object _model = new();
+    private bool _isEdit;
+    private bool _saving;
+    private string? _errorMessage;
+
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _email = string.Empty;
+    private string? _phone;
+    private string _role = string.Empty;
+    private DateOnly _hireDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _locale = "de-CH";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isEdit = Id.HasValue;
+        if (_isEdit)
+        {
+            try
+            {
+                var emp = await Service.GetByIdAsync(Id!.Value);
+                _firstName = emp.FirstName;
+                _lastName = emp.LastName;
+                _email = emp.Email;
+                _phone = emp.Phone;
+                _role = emp.Role;
+                _hireDate = emp.HireDate;
+                _locale = emp.PreferredLocale;
+            }
+            catch { Nav.NavigateTo("/app/employees"); }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName) ||
+            string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_role))
+        {
+            _errorMessage = "Please fill in all required fields.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new EmployeeRequest(_firstName, _lastName, _email, _phone, _role, null, _hireDate, _locale);
+            // System.Diagnostics.Debug.WriteLine($"Employee save request prepared: role={_role}, locale={_locale}, hireDate={_hireDate}");
+            if (_isEdit)
+                await Service.UpdateAsync(Id!.Value, request);
+            else
+                await Service.CreateAsync(request);
+
+            Nav.NavigateTo("/app/employees");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally { _saving = false; }
+    }
+}

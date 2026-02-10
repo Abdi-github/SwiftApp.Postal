@@ -1,0 +1,93 @@
+@page "/app/branches"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOrAdmin")]
+@inject SwiftApp.Postal.Modules.Branch.Application.Services.BranchService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Branch.Application.DTOs
+@using SwiftApp.Postal.WebApp.Components.Shared
+
+<PageTitle>Branches — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-building me-2" style="color:#1a237e"></i>Branches</h2>
+    <a href="/app/branches/new" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> New Branch
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="text-center py-5 text-muted"><i class="bi bi-building fs-1 d-block mb-2"></i>No branches found.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Code</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>City / ZIP</th>
+                            <th>Canton</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var b in _items)
+                        {
+                            <tr>
+                                <td><code class="small">@b.BranchCode</code></td>
+                                <td class="fw-semibold">@b.Name</td>
+                                <td><span class="badge bg-info-subtle text-info-emphasis">@b.Type</span></td>
+                                <td>@b.ZipCode @b.City</td>
+                                <td class="text-muted">@(b.Canton ?? "—")</td>
+                                <td><StatusBadge Status="@b.Status" /></td>
+                                <td class="text-end">
+                                    <a href="/app/branches/@b.Id" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="/app/branches/@b.Id/edit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3">
+                <Pagination CurrentPage="_page" TotalPages="_totalPages" TotalItems="_totalItems" OnPageChange="ChangePage" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<BranchResponse> _items = [];
+    private int _page = 1, _totalPages, _totalItems;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Service.GetPagedAsync(_page, 20, "de-CH");
+            _items = result.Items.ToList();
+            _totalPages = result.TotalPages;
+            _totalItems = (int)result.TotalItems;
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task ChangePage(int page) { _page = page; await LoadAsync(); }
+}

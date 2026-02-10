@@ -1,0 +1,126 @@
+@page "/app/parcels/{Id:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject SwiftApp.Postal.Modules.Parcel.Application.Services.ParcelService Service
+@inject SwiftApp.Postal.Modules.Tracking.Application.Services.TrackingService TrackingService
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Parcel.Application.DTOs
+@using SwiftApp.Postal.Modules.Tracking.Application.DTOs
+@using SwiftApp.Postal.WebApp.Components.Shared
+
+<PageTitle>Parcel Detail — Swiss Postal</PageTitle>
+
+@if (_parcel is null)
+{
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0"><i class="bi bi-box-seam me-2" style="color:#1a237e"></i><code>@_parcel.TrackingNumber</code></h2>
+        <div class="d-flex gap-2">
+            @if (_parcel.Status is "Created" or "LabelGenerated")
+            {
+                <button class="btn btn-outline-danger" @onclick="CancelAsync">
+                    <i class="bi bi-x-circle me-1"></i> Cancel
+                </button>
+            }
+            <a href="/app/parcels" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light fw-semibold">Parcel Info</div>
+                <div class="card-body">
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-5">Tracking #</dt>
+                        <dd class="col-sm-7"><code>@_parcel.TrackingNumber</code></dd>
+                        <dt class="col-sm-5">Type</dt>
+                        <dd class="col-sm-7"><span class="badge bg-secondary-subtle text-secondary-emphasis">@_parcel.Type</span></dd>
+                        <dt class="col-sm-5">Status</dt>
+                        <dd class="col-sm-7"><StatusBadge Status="@_parcel.Status" /></dd>
+                        <dt class="col-sm-5">Weight</dt>
+                        <dd class="col-sm-7">@(_parcel.WeightKg?.ToString("N2") ?? "—") kg</dd>
+                        <dt class="col-sm-5">Price</dt>
+                        <dd class="col-sm-7 fw-bold">CHF @_parcel.Price.ToString("N2")</dd>
+                        <dt class="col-sm-5">Created</dt>
+                        <dd class="col-sm-7 text-muted">@_parcel.CreatedAt.LocalDateTime.ToString("dd.MM.yyyy HH:mm")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light fw-semibold">Sender</div>
+                <div class="card-body small">
+                    <p class="mb-1 fw-semibold">@_parcel.SenderName</p>
+                    <p class="mb-0 text-muted">@_parcel.SenderZipCode @_parcel.SenderCity</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light fw-semibold">Recipient</div>
+                <div class="card-body small">
+                    <p class="mb-1 fw-semibold">@_parcel.RecipientName</p>
+                    <p class="mb-0 text-muted">@_parcel.RecipientZipCode @_parcel.RecipientCity</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_timeline is not null)
+    {
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-header bg-light fw-semibold"><i class="bi bi-geo-alt me-2"></i>Tracking Timeline</div>
+            <div class="card-body">
+                @if (_timeline.Events.Count == 0)
+                {
+                    <p class="text-muted mb-0">No tracking events yet.</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var ev in _timeline.Events.OrderByDescending(e => e.EventTimestamp))
+                        {
+                            <li class="d-flex mb-3">
+                                <div class="me-3 text-primary"><i class="bi bi-circle-fill" style="font-size:.6rem;margin-top:.4rem"></i></div>
+                                <div>
+                                    <div class="fw-semibold small">@ev.EventType</div>
+                                    <div class="text-muted small">@(ev.Location ?? "—") &bull; @ev.EventTimestamp.LocalDateTime.ToString("dd.MM.yyyy HH:mm")</div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private ParcelResponse? _parcel;
+    private TrackingTimelineResponse? _timeline;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _parcel = await Service.GetByIdAsync(Id);
+            try { _timeline = await TrackingService.GetTimelineAsync(_parcel.TrackingNumber); } catch { }
+        }
+        catch { Nav.NavigateTo("/app/parcels"); }
+    }
+
+    private async Task CancelAsync()
+    {
+        try
+        {
+            await Service.CancelAsync(Id);
+            _parcel = await Service.GetByIdAsync(Id);
+        }
+        catch (Exception ex) { Console.WriteLine(ex.Message); }
+    }
+}

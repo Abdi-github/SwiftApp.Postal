@@ -1,0 +1,86 @@
+@page "/app/notifications/send"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "ADMIN")]
+@inject SwiftApp.Postal.Modules.Notification.Application.Services.NotificationService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Notification.Application.DTOs
+
+<PageTitle>Send Email — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-envelope-plus me-2" style="color:#1a237e"></i>Send Email</h2>
+    <a href="/app/notifications" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+@if (_successMessage is not null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="bi bi-check-circle me-1"></i>@_successMessage
+        <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+    </div>
+}
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0" style="max-width:700px">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-7">
+                <label class="form-label fw-semibold">To Email <span class="text-danger">*</span></label>
+                <input type="email" class="form-control" @bind="_toEmail" placeholder="recipient@example.com" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">Recipient Name</label>
+                <input class="form-control" @bind="_toName" placeholder="Full name" />
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_subject" />
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Message (HTML allowed) <span class="text-danger">*</span></label>
+                <textarea class="form-control font-monospace" rows="8" @bind="_body"></textarea>
+            </div>
+        </div>
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SendAsync" disabled="@_sending">
+                @if (_sending) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-send me-1"></i> Send
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="Clear">Clear</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _sending;
+    private string? _successMessage, _errorMessage;
+    private string _toEmail = string.Empty, _toName = string.Empty, _subject = string.Empty, _body = string.Empty;
+
+    private async Task SendAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_toEmail) || string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_body))
+        {
+            _errorMessage = "Please fill in all required fields."; return;
+        }
+        _sending = true;
+        try
+        {
+            var req = new SendEmailRequest(_toEmail, _toName, _subject, _body);
+            await Service.SendEmailAsync(req.ToEmail, req.ToName, req.Subject, req.HtmlBody, null);
+            _successMessage = $"Email sent to {_toEmail}.";
+            Clear();
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _sending = false; }
+    }
+
+    private void Clear()
+    {
+        _toEmail = string.Empty; _toName = string.Empty; _subject = string.Empty; _body = string.Empty;
+    }
+}

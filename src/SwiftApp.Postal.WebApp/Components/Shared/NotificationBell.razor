@@ -1,0 +1,165 @@
+@implements IDisposable
+@inject IServiceScopeFactory ScopeFactory
+@inject SwiftApp.Postal.SharedKernel.Interfaces.ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Notification.Application.DTOs
+@using SwiftApp.Postal.Modules.Notification.Application.Services
+@using SwiftApp.Postal.Modules.Auth.Domain.Interfaces
+
+<div class="dropdown">
+    <button class="btn btn-link text-muted position-relative p-0 border-0" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+        <i class="bi bi-bell fs-5"></i>
+        @if (_unreadCount > 0)
+        {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style="font-size:.65rem">
+                @(_unreadCount > 99 ? "99+" : _unreadCount)
+            </span>
+        }
+    </button>
+    <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0" style="width:380px; max-height:480px; overflow-y:auto;">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
+            <span class="fw-semibold small">Notifications</span>
+            @if (_unreadCount > 0)
+            {
+                <span class="badge bg-danger rounded-pill">@_unreadCount new</span>
+            }
+        </div>
+
+        @if (_loading)
+        {
+            <div class="text-center py-4"><span class="spinner-border spinner-border-sm text-primary"></span></div>
+        }
+        else if (_recentItems.Count == 0)
+        {
+            <div class="text-center py-4 text-muted small">
+                <i class="bi bi-bell-slash d-block fs-4 mb-1"></i>No notifications
+            </div>
+        }
+        else
+        {
+            @foreach (var item in _recentItems)
+            {
+                <div class="dropdown-item-text px-3 py-2 border-bottom @(item.IsRead ? "" : "bg-primary bg-opacity-10") d-flex align-items-start gap-2"
+                     style="cursor:pointer; white-space:normal;"
+                     @onclick="() => HandleClick(item)">
+                    <i class="bi bi-@GetIcon(item.Category) text-primary mt-1"></i>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between">
+                            <span class="small fw-semibold">@item.Title</span>
+                            <span class="text-muted small ms-2 text-nowrap">@FormatTime(item.CreatedAt)</span>
+                        </div>
+                        <p class="mb-0 small text-muted text-truncate" style="max-width:280px">@item.Message</p>
+                    </div>
+                    @if (!item.IsRead)
+                    {
+                        <span class="bg-primary rounded-circle mt-2" style="width:8px; height:8px; min-width:8px; display:inline-block"></span>
+                    }
+                </div>
+            }
+        }
+
+        <div class="text-center border-top">
+            <a href="/app/inbox" class="d-block py-2 small text-decoration-none fw-semibold">View all notifications</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<InAppNotificationResponse> _recentItems = [];
+    private int _unreadCount;
+    private bool _loading = true;
+    private Guid _employeeId;
+    private Timer? _pollTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ResolveEmployeeId();
+        await LoadNotifications();
+        _pollTimer = new Timer(async _ => await PollAsync(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task ResolveEmployeeId()
+    {
+        try
+        {
+            var keycloakId = CurrentUser.UserId?.ToString();
+            if (keycloakId is not null)
+            {
+                await using var scope = ScopeFactory.CreateAsyncScope();
+                var authApi = scope.ServiceProvider.GetRequiredService<IAuthModuleApi>();
+                _employeeId = await authApi.GetEmployeeIdByKeycloakUserIdAsync(keycloakId) ?? Guid.Empty;
+            }
+        }
+        catch { /* Ignore resolution errors — still show broadcast notifications */ }
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<NotificationService>();
+            _recentItems = (await svc.GetInAppForEmployeeAsync(_employeeId, 8)).ToList();
+            _unreadCount = await svc.GetUnreadInAppCountAsync(_employeeId);
+        }
+        catch { /* Silently ignore failures */ }
+        finally { _loading = false; }
+    }
+
+    private async Task PollAsync()
+    {
+        try
+        {
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<NotificationService>();
+            var newCount = await svc.GetUnreadInAppCountAsync(_employeeId);
+            if (newCount != _unreadCount)
+            {
+                _unreadCount = newCount;
+                _recentItems = (await svc.GetInAppForEmployeeAsync(_employeeId, 8)).ToList();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch { /* Silently ignore polling failures */ }
+    }
+
+    private async Task HandleClick(InAppNotificationResponse item)
+    {
+        if (!item.IsRead)
+        {
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            var svc = scope.ServiceProvider.GetRequiredService<NotificationService>();
+            await svc.MarkInAppReadAsync(item.Id, _employeeId);
+            _recentItems = [.. _recentItems.Select(i => i.Id == item.Id ? i with { IsRead = true } : i)];
+            _unreadCount = Math.Max(0, _unreadCount - 1);
+        }
+        if (item.ReferenceUrl is not null)
+        {
+            Nav.NavigateTo(item.ReferenceUrl);
+        }
+    }
+
+    private static string GetIcon(string category) => category switch
+    {
+        "Parcel" or "Info" => "box-seam",
+        "Delivery" => "truck",
+        "System" => "gear",
+        "Warning" or "Alert" => "exclamation-triangle",
+        "Urgent" => "exclamation-diamond",
+        _ => "bell"
+    };
+
+    private static string FormatTime(DateTimeOffset dt)
+    {
+        var diff = DateTimeOffset.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d";
+        return dt.LocalDateTime.ToString("dd.MM");
+    }
+
+    public void Dispose() => _pollTimer?.Dispose();
+}

@@ -1,0 +1,115 @@
+@page "/app/customers/new"
+@page "/app/customers/{Id:guid}/edit"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOrAdmin")]
+@inject SwiftApp.Postal.Modules.Auth.Application.Services.CustomerService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Auth.Application.DTOs
+
+<PageTitle>@(_isEdit ? "Edit Customer" : "New Customer") — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+        <i class="bi bi-person-plus me-2" style="color:#1a237e"></i>
+        @(_isEdit ? "Edit Customer" : "New Customer")
+    </h2>
+    <a href="/app/customers" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">First Name <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_firstName" placeholder="e.g. Maria" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Last Name <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_lastName" placeholder="e.g. Meier" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+                <input type="email" class="form-control" @bind="_email" placeholder="maria.meier@example.ch" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Phone</label>
+                <input class="form-control" @bind="_phone" placeholder="+41 44 123 45 67" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Preferred Locale</label>
+                <select class="form-select" @bind="_locale">
+                    <option value="de-CH">German (CH)</option>
+                    <option value="fr-CH">French (CH)</option>
+                    <option value="it-CH">Italian (CH)</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+        </div>
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-check-lg me-1"></i>@(_isEdit ? "Save Changes" : "Create Customer")
+            </button>
+            <a href="/app/customers" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private bool _isEdit;
+    private bool _saving;
+    private string? _errorMessage;
+
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _email = string.Empty;
+    private string? _phone;
+    private string _locale = "de-CH";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isEdit = Id.HasValue;
+        if (_isEdit)
+        {
+            try
+            {
+                var c = await Service.GetByIdAsync(Id!.Value);
+                _firstName = c.FirstName;
+                _lastName = c.LastName;
+                _email = c.Email;
+                _phone = c.Phone;
+                _locale = c.PreferredLocale;
+            }
+            catch { Nav.NavigateTo("/app/customers"); }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName) || string.IsNullOrWhiteSpace(_email))
+        {
+            _errorMessage = "Please fill in all required fields.";
+            return;
+        }
+        _saving = true;
+        try
+        {
+            var req = new CustomerRequest(_firstName, _lastName, _email, _phone, _locale);
+            if (_isEdit) await Service.UpdateAsync(Id!.Value, req);
+            else await Service.CreateAsync(req);
+            Nav.NavigateTo("/app/customers");
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _saving = false; }
+    }
+}

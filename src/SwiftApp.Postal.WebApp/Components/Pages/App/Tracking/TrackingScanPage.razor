@@ -1,0 +1,100 @@
+@page "/app/tracking"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject SwiftApp.Postal.Modules.Tracking.Application.Services.TrackingService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Tracking.Application.DTOs
+
+<PageTitle>Scan Events — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-qr-code-scan me-2" style="color:#1a237e"></i>Scan / Record Event</h2>
+</div>
+
+@if (_successMessage is not null)
+{
+    <div class="alert alert-success alert-dismissible">
+        <i class="bi bi-check-circle me-1"></i>@_successMessage
+        <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+    </div>
+}
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0" style="max-width:600px">
+    <div class="card-header bg-light fw-semibold">Record Tracking Event</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label fw-semibold">Tracking Number <span class="text-danger">*</span></label>
+                <input class="form-control font-monospace" @bind="_trackingNumber" placeholder="CHE..." />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Event Type <span class="text-danger">*</span></label>
+                <select class="form-select" @bind="_eventType">
+                    <option value="">-- Select Event --</option>
+                    <option value="Accepted">Accepted at branch</option>
+                    <option value="Sorted">Sorted (hub)</option>
+                    <option value="InTransit">In transit</option>
+                    <option value="OutForDelivery">Out for delivery</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="DeliveryFailed">Delivery failed</option>
+                    <option value="Returned">Returned to sender</option>
+                    <option value="Scanned">Scanned</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Location</label>
+                <input class="form-control" @bind="_location" placeholder="e.g. Zürich Sorting Center" />
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Description</label>
+                <textarea class="form-control" rows="2" @bind="_description" placeholder="Optional notes"></textarea>
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-check me-1"></i> Record Event
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="Reset">Clear</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _saving;
+    private string? _successMessage, _errorMessage;
+    private string _trackingNumber = string.Empty, _eventType = string.Empty;
+    private string? _location, _description;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_trackingNumber) || string.IsNullOrWhiteSpace(_eventType))
+        {
+            _errorMessage = "Tracking number and event type are required."; return;
+        }
+        _saving = true;
+        try
+        {
+            var req = new TrackingEventRequest(_trackingNumber.Trim().ToUpper(), _eventType, null, _location, _description);
+            await Service.RecordEventAsync(req, null);
+            _successMessage = $"Event '{_eventType}' recorded for {_trackingNumber}.";
+            Reset();
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private void Reset()
+    {
+        _trackingNumber = string.Empty;
+        _eventType = string.Empty;
+        _location = null;
+        _description = null;
+    }
+}

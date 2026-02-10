@@ -1,0 +1,90 @@
+@page "/app/pickups/new"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject SwiftApp.Postal.Modules.Delivery.Application.Services.PickupRequestService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Delivery.Application.DTOs
+
+<PageTitle>Request Pickup — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-house-add me-2" style="color:#1a237e"></i>Request Home Pickup</h2>
+    <a href="/app/pickups" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">Customer ID <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_customerId" placeholder="Customer GUID" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Preferred Date <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" @bind="_preferredDate" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">From</label>
+                <input type="time" class="form-control" @bind="_timeFrom" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">To</label>
+                <input type="time" class="form-control" @bind="_timeTo" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Pickup Street <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_street" placeholder="e.g. Bahnhofstrasse 12" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">ZIP <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_zip" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">City <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_city" />
+            </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-check-lg me-1"></i> Submit Request
+            </button>
+            <a href="/app/pickups" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _saving;
+    private string? _errorMessage;
+    private string _customerId = string.Empty;
+    private string _street = string.Empty, _zip = string.Empty, _city = string.Empty;
+    private DateOnly _preferredDate = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+    private TimeOnly? _timeFrom, _timeTo;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_customerId) || !Guid.TryParse(_customerId, out var custId) ||
+            string.IsNullOrWhiteSpace(_street) || string.IsNullOrWhiteSpace(_zip) || string.IsNullOrWhiteSpace(_city))
+        {
+            _errorMessage = "Please fill in all required fields with a valid Customer ID."; return;
+        }
+        _saving = true;
+        try
+        {
+            var req = new PickupRequestDto(custId, _street, _zip, _city, _preferredDate, _timeFrom, _timeTo);
+            await Service.CreateAsync(req);
+            Nav.NavigateTo("/app/pickups");
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _saving = false; }
+    }
+}

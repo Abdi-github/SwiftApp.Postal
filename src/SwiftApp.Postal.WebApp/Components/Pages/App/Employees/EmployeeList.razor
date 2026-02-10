@@ -1,0 +1,93 @@
+@page "/app/employees"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOrAdmin")]
+@inject SwiftApp.Postal.Modules.Auth.Application.Services.EmployeeService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Auth.Application.DTOs
+@using SwiftApp.Postal.WebApp.Components.Shared
+
+<PageTitle>Employees — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-people me-2" style="color:#1a237e"></i>Employees</h2>
+    <a href="/app/employees/new" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> New Employee
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="text-center py-5 text-muted"><i class="bi bi-people fs-1 d-block mb-2"></i>No employees found.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Employee #</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Hired</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var emp in _items)
+                        {
+                            <tr>
+                                <td><code class="small">@emp.EmployeeNumber</code></td>
+                                <td>@emp.FirstName @emp.LastName</td>
+                                <td class="text-muted small">@emp.Email</td>
+                                <td><span class="badge bg-primary-subtle text-primary-emphasis">@emp.Role</span></td>
+                                <td><StatusBadge Status="@emp.Status" /></td>
+                                <td class="text-muted small">@emp.HireDate.ToString("dd.MM.yyyy")</td>
+                                <td class="text-end">
+                                    <a href="/app/employees/@emp.Id" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="/app/employees/@emp.Id/edit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3">
+                <Pagination CurrentPage="_page" TotalPages="_totalPages" TotalItems="_totalItems" OnPageChange="ChangePage" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<EmployeeResponse> _items = [];
+    private int _page = 1, _totalPages, _totalItems;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Service.GetPagedAsync(_page, 20);
+            _items = result.Items.ToList();
+            _totalPages = result.TotalPages;
+            _totalItems = (int)result.TotalItems;
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task ChangePage(int page) { _page = page; await LoadAsync(); }
+}

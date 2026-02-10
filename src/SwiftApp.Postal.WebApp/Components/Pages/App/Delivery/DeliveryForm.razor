@@ -1,0 +1,96 @@
+@page "/app/delivery/new"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ManagerOrAdmin")]
+@inject SwiftApp.Postal.Modules.Delivery.Application.Services.DeliveryRouteService Service
+@inject NavigationManager Nav
+@using SwiftApp.Postal.Modules.Delivery.Application.DTOs
+
+<PageTitle>New Delivery Route — Swiss Postal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="bi bi-truck me-2" style="color:#1a237e"></i>New Delivery Route</h2>
+    <a href="/app/delivery" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <i class="bi bi-exclamation-circle me-1"></i>@_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Branch ID <span class="text-danger">*</span></label>
+                <input class="form-control" @bind="_branchId" placeholder="Branch GUID" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Date <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" @bind="_date" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Assigned Employee ID</label>
+                <input class="form-control" @bind="_employeeId" placeholder="Employee GUID (optional)" />
+            </div>
+        </div>
+
+        <h6 class="fw-semibold mt-4 mb-2">Parcel Slots (tracking numbers)</h6>
+        @for (int i = 0; i < _slots.Count; i++)
+        {
+            var idx = i;
+            <div class="d-flex gap-2 mb-2 align-items-center">
+                <span class="text-muted small" style="width:24px">@(idx + 1).</span>
+                <input class="form-control form-control-sm" @bind="_slots[idx]" placeholder="CHE..." style="max-width:280px" />
+                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => _slots.RemoveAt(idx)">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        }
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" @onclick="() => _slots.Add(string.Empty)">
+            <i class="bi bi-plus me-1"></i> Add slot
+        </button>
+
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                <i class="bi bi-check-lg me-1"></i> Create Route
+            </button>
+            <a href="/app/delivery" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _saving;
+    private string? _errorMessage;
+    private string _branchId = string.Empty;
+    private string _employeeId = string.Empty;
+    private DateOnly _date = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+    private List<string> _slots = [string.Empty];
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_branchId) || !Guid.TryParse(_branchId, out var branchGuid))
+        {
+            _errorMessage = "Enter a valid Branch ID (GUID)."; return;
+        }
+        _saving = true;
+        try
+        {
+            Guid? empId = Guid.TryParse(_employeeId, out var eg) ? eg : null;
+            var slots = _slots
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select((s, i) => new DeliverySlotRequest(s.Trim(), i + 1))
+                .ToList();
+            // System.Diagnostics.Debug.WriteLine($"Prepared {slots.Count} non-empty delivery slots");
+            // TODO: Validate duplicate tracking numbers in slots before submit.
+            var req = new DeliveryRouteRequest(branchGuid, empId, _date, slots);
+            await Service.CreateAsync(req);
+            Nav.NavigateTo("/app/delivery");
+        }
+        catch (Exception ex) { _errorMessage = ex.Message; }
+        finally { _saving = false; }
+    }
+}

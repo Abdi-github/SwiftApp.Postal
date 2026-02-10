@@ -1,0 +1,32 @@
+@if (TotalPages > 1)
+{
+    <nav aria-label="Page navigation" class="mt-3">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item @(CurrentPage <= 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => OnPageChange.InvokeAsync(CurrentPage - 1)" disabled="@(CurrentPage <= 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+            </li>
+            @for (var p = Math.Max(1, CurrentPage - 2); p <= Math.Min(TotalPages, CurrentPage + 2); p++)
+            {
+                var pageNum = p;
+                <li class="page-item @(pageNum == CurrentPage ? "active" : "")">
+                    <button class="page-link" @onclick="() => OnPageChange.InvokeAsync(pageNum)">@pageNum</button>
+                </li>
+            }
+            <li class="page-item @(CurrentPage >= TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => OnPageChange.InvokeAsync(CurrentPage + 1)" disabled="@(CurrentPage >= TotalPages)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </li>
+        </ul>
+        <p class="text-center text-muted small mt-1">Page @CurrentPage of @TotalPages (@TotalItems items)</p>
+    </nav>
+}
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public int TotalItems { get; set; }
+    [Parameter] public EventCallback<int> OnPageChange { get; set; }
+}

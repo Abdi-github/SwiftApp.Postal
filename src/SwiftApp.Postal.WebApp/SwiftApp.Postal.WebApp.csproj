@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>SwiftApp.Postal.WebApp</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SwiftApp.Postal.SharedKernel\SwiftApp.Postal.SharedKernel.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Auth\SwiftApp.Postal.Modules.Auth.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Branch\SwiftApp.Postal.Modules.Branch.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Address\SwiftApp.Postal.Modules.Address.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Parcel\SwiftApp.Postal.Modules.Parcel.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Delivery\SwiftApp.Postal.Modules.Delivery.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Tracking\SwiftApp.Postal.Modules.Tracking.csproj" />
+    <ProjectReference Include="..\SwiftApp.Postal.Modules.Notification\SwiftApp.Postal.Modules.Notification.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.Seq" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" />
+    <PackageReference Include="Quartz.Extensions.Hosting" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+</Project>

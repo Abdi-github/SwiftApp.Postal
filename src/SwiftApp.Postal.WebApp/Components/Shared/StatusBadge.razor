@@ -1,0 +1,25 @@
+@{
+    var (badgeClass, icon) = Status?.ToLowerInvariant() switch
+    {
+        "created" or "pending" => ("secondary", "bi-clock"),
+        "accepted" or "labelgenerated" => ("info", "bi-tag"),
+        "sorted" => ("primary", "bi-sort-down"),
+        "intransit" or "in_transit" => ("warning", "bi-truck"),
+        "outfordelivery" or "out_for_delivery" => ("warning", "bi-geo-alt"),
+        "delivered" or "completed" => ("success", "bi-check-circle"),
+        "deliveryfailed" or "delivery_failed" or "failed" => ("danger", "bi-x-circle"),
+        "returned" => ("secondary", "bi-arrow-return-left"),
+        "cancelled" or "canceled" => ("dark", "bi-x-octagon"),
+        "active" => ("success", "bi-check-circle"),
+        "inactive" or "deactivated" => ("secondary", "bi-dash-circle"),
+        "suspended" => ("warning", "bi-pause-circle"),
+        _ => ("secondary", "bi-question-circle")
+    };
+}
+<span class="badge rounded-pill bg-@badgeClass">
+    <i class="bi @icon me-1"></i>@Status
+</span>
+
+@code {
+    [Parameter] public string? Status { get; set; }
+}

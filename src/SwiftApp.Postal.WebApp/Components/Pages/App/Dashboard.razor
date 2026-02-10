@@ -1,0 +1,138 @@
+@page "/app"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject SwiftApp.Postal.WebApp.Services.DashboardService DashboardSvc
+
+<PageTitle>Dashboard — Swiss Postal</PageTitle>
+
+<h2 class="mb-4">
+    <i class="bi bi-speedometer2 me-2" style="color: #1a237e;"></i>Dashboard
+</h2>
+
+@if (_stats is null)
+{
+    <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+}
+else
+{
+    <div class="row g-4 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#e3f2fd">
+                            <i class="bi bi-box-seam fs-4 text-primary"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">Total Parcels</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.TotalParcels</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#fff3e0">
+                            <i class="bi bi-truck fs-4 text-warning"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">In Transit</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.ParcelsInTransit</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#e8f5e9">
+                            <i class="bi bi-building fs-4 text-success"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">Active Branches</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.ActiveBranches</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#fce4ec">
+                            <i class="bi bi-people fs-4" style="color:#1a237e"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">Active Employees</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.ActiveEmployees</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#f3e5f5">
+                            <i class="bi bi-person-badge fs-4 text-purple" style="color:#6a1b9a"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">Customers</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.ActiveCustomers</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#e0f7fa">
+                            <i class="bi bi-geo-alt fs-4 text-info"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">Active Routes</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.ActiveRoutes</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle p-3 me-3" style="background:#fff8e1">
+                            <i class="bi bi-calendar-check fs-4" style="color:#f57f17"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">Pending Pickups</h6>
+                            <h3 class="mb-0 fw-bold">@_stats.PendingPickups</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SwiftApp.Postal.WebApp.Services.DashboardStats? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _stats = await DashboardSvc.GetStatsAsync(); }
+        catch { _stats = new(0, 0, 0, 0, 0, 0, 0); }
+    }
+}
+
