@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.SharedKernel\SwiftApp.Postal.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Auth\SwiftApp.Postal.Modules.Auth.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Branch\SwiftApp.Postal.Modules.Branch.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Address\SwiftApp.Postal.Modules.Address.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Parcel\SwiftApp.Postal.Modules.Parcel.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Delivery\SwiftApp.Postal.Modules.Delivery.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Tracking\SwiftApp.Postal.Modules.Tracking.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.Modules.Notification\SwiftApp.Postal.Modules.Notification.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.WebApi\SwiftApp.Postal.WebApi.csproj" />
+    <ProjectReference Include="..\..\src\SwiftApp.Postal.WebApp\SwiftApp.Postal.WebApp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+</Project>
