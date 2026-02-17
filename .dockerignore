@@ -1,0 +1,17 @@
+# Exclude build artifacts so host obj/bin folders don't pollute the image layers.
+# Without this, COPY src/ copies pre-built obj/ files that conflict with the
+# container's own build output (causing CS0579 duplicate attribute errors).
+**/obj/
+**/bin/
+
+# Test output
+**/TestResults/
+
+# IDE
+**/.vs/
+**/.idea/
+**/*.user
+
+# Secrets / local config
+**/appsettings.Development.json
+**/appsettings.Local.json
