@@ -22,6 +22,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG PROJECT=SwiftApp.Postal.WebApi
 WORKDIR /build
 
+COPY --from=restore /root/.nuget /root/.nuget
 COPY --from=restore /build ./
 COPY src/ ./src/
 
