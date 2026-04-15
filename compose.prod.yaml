@@ -7,6 +7,9 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: swiftapp-postal-db
+    labels:
+      - "sablier.enable=true"
+      - "sablier.group=postal-dotnet"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -30,6 +33,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: swiftapp-postal-redis
+    labels:
+      - "sablier.enable=true"
+      - "sablier.group=postal-dotnet"
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -53,6 +59,9 @@ services:
       args:
         PROJECT: SwiftApp.Postal.WebApi
     container_name: swiftapp-postal-webapi
+    labels:
+      - "sablier.enable=true"
+      - "sablier.group=postal-dotnet"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:8080"
@@ -90,6 +99,9 @@ services:
       args:
         PROJECT: SwiftApp.Postal.WebApp
     container_name: swiftapp-postal-webapp
+    labels:
+      - "sablier.enable=true"
+      - "sablier.group=postal-dotnet"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:8080"
@@ -134,10 +146,14 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.allownonrunning=true"
       - "traefik.http.routers.swiftapp-postal.rule=Host(`postal-dotnet.swiftapp.ch`)"
       - "traefik.http.routers.swiftapp-postal.entrypoints=websecure"
       - "traefik.http.routers.swiftapp-postal.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.swiftapp-postal.middlewares=sablier-postal-dotnet@file"
       - "traefik.http.services.swiftapp-postal.loadbalancer.server.port=80"
+      - "sablier.enable=true"
+      - "sablier.group=postal-dotnet"
     deploy:
       resources:
         limits:
