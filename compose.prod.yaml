@@ -87,14 +87,19 @@ services:
     build:
       context: ./docker/nginx
     container_name: swiftapp-postal-nginx
-    ports:
-      - "80:80"
     depends_on:
       - webapi
       - webapp
     restart: unless-stopped
     networks:
       - frontend
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.swiftapp-postal.rule=Host(`postal-dotnet.swiftapp.ch`)"
+      - "traefik.http.routers.swiftapp-postal.entrypoints=websecure"
+      - "traefik.http.routers.swiftapp-postal.tls.certresolver=letsencrypt"
+      - "traefik.http.services.swiftapp-postal.loadbalancer.server.port=80"
 
 volumes:
   pgdata:
@@ -107,3 +112,5 @@ networks:
     driver: bridge
   frontend:
     driver: bridge
+  traefik:
+    external: true
