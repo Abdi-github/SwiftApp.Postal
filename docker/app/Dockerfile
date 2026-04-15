@@ -64,6 +64,3 @@ ENTRYPOINT ["sh", "-c", "exec dotnet \"$APP_DLL\""]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget -qO- http://127.0.0.1:8080/health || exit 1
-
-ENTRYPOINT ["dotnet"]
-CMD ["sh", "-c", "dotnet $APP_DLL"]
