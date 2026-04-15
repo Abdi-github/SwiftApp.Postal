@@ -54,12 +54,13 @@ USER appuser:appgroup
 
 EXPOSE 8080
 
-ENV ASPNETCORE_URLS="http://+:8080" \
+ARG PROJECT=SwiftApp.Postal.WebApi
+ENV APP_DLL="${PROJECT}.dll" \
+    ASPNETCORE_URLS="http://+:8080" \
     DOTNET_RUNNING_IN_CONTAINER=true \
     TZ=Europe/Zurich
 
-ARG PROJECT=SwiftApp.Postal.WebApi
-ENV APP_DLL="${PROJECT}.dll"
+ENTRYPOINT ["sh", "-c", "exec dotnet \"$APP_DLL\""]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget -qO- http://127.0.0.1:8080/health || exit 1
