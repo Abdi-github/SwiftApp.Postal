@@ -38,10 +38,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 LABEL maintainer="SwiftApp Postal <dev@swiftapp.ch>"
 LABEL description="SwiftApp Postal — Swiss Postal Backend Platform"
 
-RUN apk add --no-cache curl tzdata \
+RUN apk add --no-cache curl tzdata icu-libs \
     && cp /usr/share/zoneinfo/Europe/Zurich /etc/localtime \
     && echo "Europe/Zurich" > /etc/timezone \
     && apk del tzdata
+
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 RUN addgroup -g 1000 -S appgroup \
     && adduser -u 1000 -S appuser -G appgroup
