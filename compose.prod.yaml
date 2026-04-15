@@ -5,9 +5,8 @@
 services:
 
   postgres:
-    image: postgres:17
+    image: postgres:17-alpine
     container_name: swiftapp-postal-db
-    mem_limit: 512m
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,14 +18,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     restart: unless-stopped
     networks:
       - backend
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   redis:
     image: redis:7-alpine
     container_name: swiftapp-postal-redis
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,6 +41,10 @@ services:
     restart: unless-stopped
     networks:
       - backend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   webapi:
     build:
@@ -47,6 +55,7 @@ services:
     container_name: swiftapp-postal-webapi
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://+:8080"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379,abortConnect=false"
       Jwt__SecretKey: ${JWT_SECRET}
@@ -57,10 +66,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     restart: unless-stopped
     networks:
       - backend
       - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 384M
 
   webapp:
     build:
@@ -71,6 +90,7 @@ services:
     container_name: swiftapp-postal-webapp
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://+:8080"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379,abortConnect=false"
     depends_on:
@@ -78,18 +98,30 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     restart: unless-stopped
     networks:
       - backend
       - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 384M
 
   nginx:
     build:
       context: ./docker/nginx
     container_name: swiftapp-postal-nginx
     depends_on:
-      - webapi
-      - webapp
+      webapi:
+        condition: service_healthy
+      webapp:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - frontend
@@ -100,17 +132,25 @@ services:
       - "traefik.http.routers.swiftapp-postal.entrypoints=websecure"
       - "traefik.http.routers.swiftapp-postal.tls.certresolver=letsencrypt"
       - "traefik.http.services.swiftapp-postal.loadbalancer.server.port=80"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 volumes:
   pgdata:
     driver: local
+    name: swiftapp-postal-pgdata-prod
   redis_data:
     driver: local
+    name: swiftapp-postal-redis-prod
 
 networks:
   backend:
     driver: bridge
+    name: swiftapp-postal-backend
   frontend:
     driver: bridge
+    name: swiftapp-postal-frontend
   traefik:
     external: true
