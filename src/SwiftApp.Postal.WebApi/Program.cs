@@ -265,7 +265,7 @@ app.UseAuthorization();
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health").AllowAnonymous();
 app.MapHub<SwiftApp.Postal.WebApi.Hubs.NotificationHub>("/hubs/notifications");
 
 app.Run();

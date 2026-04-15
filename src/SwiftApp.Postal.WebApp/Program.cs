@@ -313,6 +313,6 @@ app.MapGet("/logout", async (HttpContext ctx) =>
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
