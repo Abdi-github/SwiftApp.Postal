@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -30,6 +31,15 @@ builder.WebHost.ConfigureKestrel(opts =>
 {
     opts.Limits.MaxRequestHeadersTotalSize = 1024 * 128; // 128 KB (default 32 KB)
     opts.Limits.MaxRequestHeaderCount = 200;
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
+                               ForwardedHeaders.XForwardedProto |
+                               ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // ── Serilog ─────────────────────────────────────────────
@@ -137,11 +147,9 @@ builder.Services.AddAuthentication(options =>
     options.ClientId = builder.Configuration["Keycloak:ClientId"];
     options.ClientSecret = builder.Configuration["Keycloak:ClientSecret"];
     options.ResponseType = OpenIdConnectResponseType.Code;
-    options.SaveTokens = true;
-    // Keycloak includes all needed claims (sub, name, email, preferred_username, realm_access)
-    // in the ID token when profile/email scopes are requested. The back-channel UserInfo call
-    // would fail because the token's iss (browser-facing 127.0.0.1:8090) doesn't match the
-    // UserInfo endpoint host (internal keycloak:8080), causing a 401. Disable it.
+    options.SaveTokens = false;
+    // Tokens aren't stored in the auth cookie to avoid oversized headers.
+    // The id_token is saved separately in OnTokenValidated for logout (id_token_hint).
     options.GetClaimsFromUserInfoEndpoint = false;
     options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.Scope.Clear();
@@ -160,9 +168,22 @@ builder.Services.AddAuthentication(options =>
     {
         OnTokenValidated = context =>
         {
+            // Save id_token for logout (Keycloak requires id_token_hint).
+            // We don't use SaveTokens=true to keep cookies small; instead store
+            // only the id_token in a dedicated HttpOnly cookie.
+            var idToken = context.TokenEndpointResponse?.IdToken;
+            if (idToken is not null)
+            {
+                context.HttpContext.Response.Cookies.Append("postal.id_token", idToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = context.HttpContext.Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,
+                    MaxAge = TimeSpan.FromHours(8)
+                });
+            }
+
             // Extract Keycloak realm_access.roles into ClaimTypes.Role claims.
-            // Keycloak places realm_access in the access token, not the ID token, so we
-            // decode the access token to get the roles when not found in the ID token.
             if (context.Principal?.Identity is not ClaimsIdentity identity) return Task.CompletedTask;
 
             var realmAccessJson = context.Principal.FindFirst("realm_access")?.Value;
@@ -218,6 +239,15 @@ builder.Services.AddAuthentication(options =>
         },
         OnRedirectToIdentityProviderForSignOut = context =>
         {
+            // Attach id_token_hint from the dedicated cookie (Keycloak 25+ requires it)
+            if (context.HttpContext.Request.Cookies.TryGetValue("postal.id_token", out var idToken)
+                && !string.IsNullOrEmpty(idToken))
+            {
+                context.ProtocolMessage.IdTokenHint = idToken;
+            }
+            // Clear the id_token cookie
+            context.HttpContext.Response.Cookies.Delete("postal.id_token");
+
             if (keycloakPublicAuthority != keycloakAuthority
                 && context.ProtocolMessage.IssuerAddress is not null)
             {
@@ -253,6 +283,8 @@ builder.Services.AddScoped<SwiftApp.Postal.Modules.Notification.Domain.Interface
 var app = builder.Build();
 // ─────────────────────────────────────────────────────────
 
+app.UseForwardedHeaders();
+
 // Redirect 0.0.0.0 to localhost — browsers don't handle cookies for 0.0.0.0 properly,
 // which breaks OIDC correlation cookies and causes authentication failures.
 app.Use(async (context, next) =>
@@ -274,7 +306,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
-app.UseStaticFiles();
+app.MapStaticAssets();
 
 var supportedCultures = new[] { "de-CH", "fr-CH", "it-CH", "en" };
 app.UseRequestLocalization(new RequestLocalizationOptions
@@ -298,10 +330,11 @@ app.UseAntiforgery();
 app.MapGet("/", () => Results.Redirect("/app"));
 
 // Auth endpoints for OIDC login/logout
-app.MapGet("/login", (string? returnUrl) =>
+app.MapGet("/auth/login", (string? returnUrl) =>
     Results.Challenge(
         new AuthenticationProperties { RedirectUri = returnUrl ?? "/app" },
-        [OpenIdConnectDefaults.AuthenticationScheme]));
+        [OpenIdConnectDefaults.AuthenticationScheme]))
+    .AllowAnonymous();
 
 app.MapGet("/logout", async (HttpContext ctx) =>
 {

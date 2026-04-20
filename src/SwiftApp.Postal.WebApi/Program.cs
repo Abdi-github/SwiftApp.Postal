@@ -268,4 +268,10 @@ app.MapControllers();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapHub<SwiftApp.Postal.WebApi.Hubs.NotificationHub>("/hubs/notifications");
 
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.Run();

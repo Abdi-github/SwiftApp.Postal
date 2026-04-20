@@ -1,0 +1,35 @@
+@page "/login"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<PageTitle>Login — Swiss Postal</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center" style="min-height: 100vh; background: #1a1a2e;">
+    <div class="card shadow" style="max-width: 420px; width: 100%; border-radius: 1rem;">
+        <div class="text-center p-4" style="background: #ffcc00; color: #1a1a2e; border-radius: 1rem 1rem 0 0;">
+            <div style="font-size: 3rem;">📮</div>
+            <h4 class="fw-bold mt-2 mb-0">Swiss Postal</h4>
+            <small>Postal Service Platform</small>
+        </div>
+        <div class="card-body p-4">
+            <a href="/auth/login" class="btn w-100 fw-bold d-flex align-items-center justify-content-center gap-2"
+               style="background: #ffcc00; color: #1a1a2e;">
+                <i class="bi bi-shield-lock"></i> Sign in with Keycloak
+            </a>
+            <div class="text-center mt-2">
+                <small class="text-muted">You will be redirected to the identity provider</small>
+            </div>
+
+            <hr class="my-3" />
+            <p class="text-muted small text-center mb-2">Demo Accounts <span class="text-secondary">(use on Keycloak login page)</span></p>
+            <table class="table table-sm small mb-0">
+                <thead><tr><th>Username</th><th>Password</th><th>Role</th></tr></thead>
+                <tbody>
+                    <tr><td>admin-postal</td><td>pass123</td><td>Admin</td></tr>
+                    <tr><td>manager1-postal</td><td>pass123</td><td>Branch Manager</td></tr>
+                    <tr><td>emp1-postal</td><td>pass123</td><td>Employee</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -22,7 +22,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    restart: unless-stopped
+    restart: no
     networks:
       - backend
     deploy:
@@ -44,7 +44,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
+    restart: no
     networks:
       - backend
     deploy:
@@ -83,7 +83,7 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 3
-    restart: unless-stopped
+    restart: no
     networks:
       - backend
       - frontend
@@ -122,7 +122,7 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 3
-    restart: unless-stopped
+    restart: no
     networks:
       - backend
       - frontend
@@ -140,7 +140,7 @@ services:
         condition: service_healthy
       webapp:
         condition: service_healthy
-    restart: unless-stopped
+    restart: no
     networks:
       - frontend
       - traefik
